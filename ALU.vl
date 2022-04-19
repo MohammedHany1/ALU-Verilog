@@ -1,0 +1,271 @@
+`define NUM_BITS 5
+
+module AND_gate( output [N:0] C, input [N:0] A, input [N:0] B );
+    parameter N = `NUM_BITS-1;
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        and(C[i], A[i], B[i]);
+    end
+    endgenerate
+endmodule
+
+module OR_gate( output [N:0] C, input [N:0] A, input [N:0] B );
+    parameter N = `NUM_BITS-1;
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        or(C[i], A[i], B[i]);
+    end
+    endgenerate
+endmodule
+
+module XOR_gate( output [N:0] C, input [N:0] A, input [N:0] B );
+    parameter N = `NUM_BITS-1;
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        xor(C[i], A[i], B[i]);
+    end
+    endgenerate
+endmodule
+
+module NOT_gate( output [N:0] C, input [N:0] A );
+    parameter N = `NUM_BITS-1;
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        not(C[i], A[i] );
+    end
+    endgenerate
+endmodule
+
+module Not(output o, input a);
+    assign o = ~ a;
+endmodule
+
+module And(output o, input a, input b, input c);
+    assign o = a & b & c;
+endmodule
+
+module Or(output o, input a, input b, input c, input d);
+    assign o = a | b | c | d;
+endmodule
+
+module multiplexer( output E, input a, input b, input c, input d, input S0, input S1 );
+    wire T1, T2;//Not Wire
+    wire [3:0]and_wire;
+    Not v(T1, S0);
+    Not z(T2, S1);
+    And A1(and_wire[0], a, T1, T2);
+    And A2(and_wire[1], b, T2, S0);
+    And A3(and_wire[2], c, T1, S1);
+    And A4(and_wire[3], d, S0, S1);
+    Or o(E, and_wire[0], and_wire[1], and_wire[2], and_wire[3]);
+endmodule
+
+module logicCircuit(output [N:0]out, output carry, input [N:0]x, input [N:0]y, input s0, input s1);
+    parameter N = `NUM_BITS-1;
+    wire [N:0]E1;
+    wire [N:0]E2;
+    wire [N:0]E3;
+    wire [N:0]E4;
+    assign carry = 0;
+    AND_gate a(E1, x, y);
+    OR_gate o(E2, x, y);
+    XOR_gate xx(E3, x, y);
+    NOT_gate jh(E4, x);
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        multiplexer m(out[i], E1[i], E2[i], E3[i], E4[i], s0, s1);
+    end
+    endgenerate
+
+endmodule
+
+module D_FlipFlop(output q, input d);
+    assign q = d;
+endmodule
+
+module half_adder(sum, carry, a, b);
+   input a, b;
+   output sum, carry;
+   xor(sum, a, b);
+   and(carry, a, b);
+endmodule
+
+module full_adder(sum, carry, x, y, z);
+   input x, y, z;
+   output sum, carry;
+   wire s1, c1, c2;
+   half_adder h1(s1, c1, x, y);
+   half_adder h2(sum, c2, s1, z);
+   or(carry, c1, c2);
+endmodule
+
+module Incrementer(output [N:0]result, output Carry, input [N:0] num);
+   parameter N = `NUM_BITS-1;
+   wire [N-1:0] carry;
+   reg b = 1;   
+   half_adder hd1(result[0], carry[0], num[0], b);
+   generate
+      genvar i;
+      for(i=1; i<N; i=i+1)
+      begin
+         half_adder hd2(result[i], carry[i], num[i], carry[i-1]);
+      end
+   endgenerate
+   half_adder hd3(result[N], Carry, num[N], carry[N-1]);
+endmodule
+
+module Decrementer(output [N:0]result, output Carry, input [N:0] num);
+   parameter N = `NUM_BITS-1;
+   wire [N-1:0] carry;
+   reg carryIn = 0;
+   reg b = 1;
+   full_adder fd1(result[0], carry[0], num[0], b, carryIn);
+   generate
+      genvar i;
+      for(i=1; i<N; i=i+1)
+      begin
+         full_adder fd2(result[i], carry[i], num[i], b, carry[i-1]);
+      end
+   endgenerate
+   full_adder fd4(result[N], Carry, num[N], b, carry[N-1]);
+endmodule
+
+module shift_right(output [N:0] serial_output, output carry, input [N:0] serial_input);
+    parameter N = `NUM_BITS-1;
+    D_FlipFlop flipflop1(serial_output[N], serial_input[N]);
+    generate
+    genvar i;
+    for(i=N-1; i>=0; i=i-1)
+    begin
+        D_FlipFlop flipflop(serial_output[i], serial_input[i+1]);
+    end
+    endgenerate
+    assign carry = 0;
+endmodule
+module shift_left(output [N:0] serial_output, output carry, input [N:0] serial_input);
+    parameter N = `NUM_BITS-1;
+    assign carry = 0;
+    reg false = 0;
+    generate
+    genvar i;
+    for(i=N; i>0; i=i-1)
+    begin
+        D_FlipFlop flipflop(serial_output[i], serial_input[i-1]);
+    end
+    endgenerate
+    D_FlipFlop flipflop1(serial_output[0], false);
+endmodule
+module adder_subtractor(sum, carry, overflow, Num_1, Num_2, operation);
+   parameter N = `NUM_BITS-1;
+   output [N:0]sum;    // The 4-bit sum/difference.
+   output carry;    // carry
+   output overflow;    // the one bit which generated of overflow
+   input [N:0]Num_1;    // The 4-bit augend
+   input [N:0]Num_2;    // The 4-bit addend
+   input operation;    // The operations if : 0 => Add, if  1=>Subtract.
+   wire [N:0]carry1;
+   wire [N:0]B;
+   generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        xor(B[i], Num_2[i], operation);
+    end
+   endgenerate
+   xor(carry, carry1[N], operation);    // Carry = C3 for addition, Carry = not(C3) for subtraction.
+   xor(overflow, carry1[N], carry1[N-1]);    // If the two most significant carry output bits differ, then we have an overflow.
+   
+   full_adder fa0(sum[0], carry1[0], Num_1[0], B[0], operation);    // Least significant bit.
+      generate
+    for(i=1; i<=N; i=i+1)
+    begin
+        full_adder fa1(sum[i], carry1[i], Num_1[i], B[i], carry1[i-1]);
+    end
+    endgenerate
+endmodule //ripple_carry_adder_subtractor
+
+module arithmeticCircuit(
+    output [N+1:0]D, //circuit final output (D)
+    input [N:0]A, //circuit input (A)
+    input [N:0]B, //circuit input (B)
+    input cin,
+    input s0,
+    input s1);
+    parameter N = `NUM_BITS-1;
+    wire [N:0]E1;
+    wire [N:0]E2;
+    wire [N:0]E3;
+    wire [N:0]E4;
+    wire [3:0]carry;
+    reg true = 1, false = 0;
+    adder_subtractor subtractor(E1, carry[0], overflow, A, B, true);
+    Incrementer increment(E2, carry[1], A);
+    Decrementer decrement(E3, carry[2], A);
+    adder_subtractor adder(E4, carry[3], overflow, A, B, false);
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        multiplexer m(D[i], E1[i], E2[i], E3[i], E4[i], s0, s1); 
+    end
+    endgenerate
+    multiplexer m1(D[N+1], carry[0], carry[1], carry[2], carry[3], s0, s1);
+
+endmodule
+
+module alu(output [N+1:0]F, input cin, input s0, input s1, input s2, input s3, input [N:0]A, input [N:0]B);
+    parameter N = `NUM_BITS-1;
+    wire [N+1:0]D;
+    wire [N:0]E;
+    wire [N:0]E3;
+    wire [N:0]E4;
+    reg cout = 1;
+    wire [2:0]carry;
+    arithmeticCircuit arithmetic_Circuit(D, A, B, cin, s0, s1);
+    logicCircuit logic_Circuit(E, carry[0], A, B, s0, s1);
+    shift_right shiftRight(E3, carry[1], A);
+    shift_left shiftLeft(E4, carry[2], A);
+    generate
+    genvar i;
+    for(i=0; i<=N; i=i+1)
+    begin
+        multiplexer m(F[i], D[i], E[i], E3[i], E4[i], s2, s3); 
+    end
+    endgenerate
+    multiplexer m1(F[N+1], D[N+1], carry[0], carry[1], carry[2], s2, s3);
+
+endmodule
+
+module main();
+    parameter N = `NUM_BITS-1;
+    wire [N+1:0]F;
+    wire cin = 1, s0 = 1, s1 = 1, s2 = 1, s3 = 1; //s3 s2 s2 s1
+    reg  [N:0]A;
+    reg  [N:0]B;
+    reg i = 0;
+    alu Al(F, cin, s0, s1, s2, s3, A, B);
+    initial begin
+        A[0] = 0;
+        A[1] = 0;
+        A[2] = 1;
+        A[3] = 0;
+        A[4] = 0;
+
+        B[0] = 0;
+        B[1] = 1;
+        B[2] = 0;
+        B[3] = 0;
+        B[4] = 0;
+        $monitor("F= %b%b%b%b%b", F[5], F[4], F[3], F[2], F[1], F[0]);
+    end
+endmodule
